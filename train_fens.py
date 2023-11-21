@@ -312,7 +312,7 @@ if __name__ == '__main__':
         small_matrix = np.ascontiguousarray(small_matrix)
         with tqdm(total=result.shape[0], desc="Calculating memmap chunking dot", unit="chunks") as pbar_outer:
             for i in range(0, result.shape[0], chunk_size):
-                pbar_outer.update(1)  # Update progress bar for each batch
+                pbar_outer.update(chunk_size)  # Update progress bar for each batch
                 end = i + chunk_size
                 result[i:end] = np.dot(big_matrix[i:end], small_matrix)
         return result
