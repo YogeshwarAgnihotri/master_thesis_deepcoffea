@@ -20,6 +20,7 @@ import argparse
 import random
 import pickle
 import keras.backend as K
+from tqdm import tqdm
 #### Stop the model training when 0.002 to get the best result in the paper!!!!
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1";
@@ -296,9 +297,25 @@ if __name__ == '__main__':
         all_embs = np.concatenate((tor_embs, exit_embs), axis=0)
         all_embs = all_embs / np.linalg.norm(all_embs, axis=-1, keepdims=True)
         mid = int(len(all_embs) / 2)
-        all_sims = np.dot(all_embs[:mid], all_embs[mid:].T)
+        #from original code
+        #all_sims = np.dot(all_embs[:mid], all_embs[mid:].T)
+        all_sims = memmap_chunking_dot(all_embs[:mid], all_embs[mid:].T,chunk_size=100)
         return all_sims
-
+    
+    # function from https://stackoverflow.com/questions/27668462/numpy-dot-memoryerror-my-dot-very-slow-but-works-why
+    # modfied for it to use memmap
+    def memmap_chunking_dot(big_matrix, small_matrix, chunk_size=100):
+        # Create a memory-mapped array to store the result
+        result_shape = (big_matrix.shape[0], small_matrix.shape[1])
+        result = np.memmap(".result_array", dtype=np.float32, mode='w+', shape=result_shape)
+        # Make a copy if the array is not already contiguous
+        small_matrix = np.ascontiguousarray(small_matrix)
+        with tqdm(total=result.shape[0], desc="Calculating memmap chunking dot", unit="chunks") as pbar_outer:
+            for i in range(0, result.shape[0], chunk_size):
+                pbar_outer.update(1)  # Update progress bar for each batch
+                end = i + chunk_size
+                result[i:end] = np.dot(big_matrix[i:end], small_matrix)
+        return result
 
     def build_negatives(anc_idxs, pos_idxs, similarities, neg_imgs_idx, num_retries=50):
         # If no similarities were computed, return a random negative
@@ -350,7 +367,7 @@ if __name__ == '__main__':
 
             if conv1:
                 self.similarities = build_similarities(conv1, conv2, self.Xa_all,
-                                                       self.Xp_all)  # compute all similarities including cross pairs
+                                                        self.Xp_all)  # compute all similarities including cross pairs
             else:
                 self.similarities = None
 
